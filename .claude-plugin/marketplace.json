@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "brother-claudius",
+  "description": "A one-plugin abbey: the Trappist vow-of-silence for Claude Code.",
+  "owner": {
+    "name": "githumps",
+    "url": "https://github.com/githumps"
+  },
+  "plugins": [
+    {
+      "name": "vow-of-silence",
+      "displayName": "Vow of Silence (Brother Claudius)",
+      "description": "Claude takes a Trappist vow of silence: zero conversational prose — work flows only through tool calls, diffs, code blocks, and bracketed stage directions.",
+      "category": "output-style",
+      "source": "./",
+      "homepage": "https://brotherclaudi.us",
+      "version": "1.0.0",
+      "tags": ["persona", "output-style", "silent", "trappist", "crab"]
+    }
+  ]
+}

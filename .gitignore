@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Runtime scrolls — produced when the skill is exercised inside this repo
+cloister/
+
+# Internal design brief — local working notes, not for distribution
+design.md
