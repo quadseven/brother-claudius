@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="la">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>brother claudi·us</title>
+<meta name="description" content="Knock, take the vow of silence, and look in on a small monk-crab in his candlelit cellar." />
+<meta property="og:title" content="brother claudi·us" />
+<meta property="og:description" content="Silentivm est avrvm, ergo tace et ditesce." />
+<meta property="og:type" content="website" />
+<!-- Manuscript fonts (Grenze Gotisch / Cinzel) are injected by JS after load
+     so a slow font CDN can never stall the page; serif fallback shows first. -->
+<style>
+  :root{
+    /* sampled from brother.png */
+    --robe:#b54420;
+    --flame:#fdf30b;
+    --foam:#f2e7cc;
+    --ink:#2a2017;
+    --gold:#b08a3c;
+    --inkgold:#b08a3c;          /* inscription colour (tweakable) */
+    --paper:#f2e7cc;
+    --bg:#0a0705;               /* the dark hallway we stand in */
+
+    /* candle flame anchor within the framed scene */
+    --cx:91.5%;
+    --cy:43%;
+
+    /* runtime candle intensity, 0..1 */
+    --flick:0.74;
+
+    /* threshold floor-fade height (Floor fade tweak) */
+    --spillH:46%;
+
+    /* arch + column geometry (kept in sync with the clip path + band viewBox) */
+    --aw:100;
+    --ah:130;
+    --fh:min(82vh, 100vw);      /* portal height */
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{
+    background:var(--bg);
+    overflow:hidden;
+    font-family:"Cinzel", Georgia, serif;
+    color:var(--paper);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .stage{
+    position:fixed; inset:0;
+    display:grid; place-items:center;
+    background:
+      radial-gradient(120% 86% at 50% 42%, #140d08 0%, #0a0705 62%, #060403 100%);
+    overflow:hidden;
+    touch-action:manipulation;
+  }
+
+  /* faint warm light spilling out of the arch into the dark hall */
+  .bloom{
+    position:absolute; left:50%; top:44%;
+    width:calc(var(--fh) * 1.35); height:calc(var(--fh) * 1.35);
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+    background:radial-gradient(closest-side,
+      rgba(244,176,72, calc(0.16 * var(--flick))) 0%,
+      rgba(150,80,24, calc(0.06 * var(--flick))) 42%,
+      rgba(0,0,0,0) 70%);
+    filter:blur(8px);
+    /* the room is sealed until the doors open — only a thin seam of warmth leaks out */
+    opacity:.28; transition:opacity 2.4s ease;
+  }
+  .ready .bloom{ opacity:1; }
+
+  /* the portal: a fixed-aspect arch-on-columns, centred, viewport-independent */
+  .portal{
+    position:relative;
+    height:var(--fh);
+    width:calc(var(--fh) * var(--aw) / var(--ah));
+    overflow:visible;          /* lets the crown inscription + trace sit above the arch */
+  }
+
+  /* the opening — a simple clip mask in the shape of a Romanesque arch on piers */
+  .frame{
+    position:absolute; inset:0;
+    -webkit-clip-path:url(#archclip);
+    clip-path:url(#archclip);
+    background:var(--bg);
+    perspective:1500px;
+    perspective-origin:50% 44%;
+  }
+
+  .scene{ position:absolute; inset:0; }
+  .scene .layer{ position:absolute; inset:0; pointer-events:none; }
+  .glow, .glow-core, .glow-pool, .glow-window, .smoke{ position:absolute; pointer-events:none; }
+
+  /* the drawing — scaled to fill the width, hung from the top so the floor
+     fades down into our darkness at the threshold */
+  .art{
+    position:absolute; top:0; left:50%;
+    transform:translateX(-50%);
+    width:108%; height:auto;
+    display:block;
+    user-select:none; -webkit-user-drag:none;
+  }
+
+  /* evening colour-grade — deepen the daylit cloister into a warm cellar */
+  .grade{
+    background:
+      radial-gradient(42% 46% at 50% 46%, rgba(58,42,28,0) 0%, rgba(58,42,28,0) 34%, rgba(42,30,20,0.55) 100%),
+      radial-gradient(26% 26% at var(--cx) var(--cy), rgba(70,50,30,0) 0%, rgba(58,42,28,0) 42%, rgba(40,28,18,0.46) 100%);
+    mix-blend-mode:multiply;
+  }
+  .vignette{
+    background:radial-gradient(76% 74% at 50% 44%, rgba(20,13,7,0) 50%, rgba(12,8,5,0.62) 100%);
+    mix-blend-mode:multiply;
+  }
+
+  /* darkness from our side, spilling onto the threshold at the very bottom:
+     opaque page-dark at the floor → fully clear at the top, height = --spillH */
+  .spill{
+    background:linear-gradient(to top,
+      var(--bg) 0%,
+      rgba(10,7,5,0) var(--spillH, 46%));
+    z-index:4;
+  }
+
+  /* candle warmth = the page's heartbeat */
+  .glow{
+    left:var(--cx); top:var(--cy);
+    width:54%; height:54%;
+    transform:translate(-50%,-50%);
+    mix-blend-mode:screen;
+    background:radial-gradient(closest-side,
+      rgba(255,224,120, calc(0.55 * var(--flick))) 0%,
+      rgba(243,164,60, calc(0.34 * var(--flick))) 26%,
+      rgba(150,80,24, calc(0.12 * var(--flick))) 52%,
+      rgba(0,0,0,0) 74%);
+    filter:blur(2px);
+    animation:flame 0.55s ease-in-out infinite;
+  }
+  .glow-core{
+    left:var(--cx); top:var(--cy);
+    width:8%; height:11%;
+    transform:translate(-50%,-50%);
+    mix-blend-mode:screen;
+    background:radial-gradient(closest-side,
+      rgba(255,246,196, calc(0.9 * var(--flick))) 0%,
+      rgba(255,210,90, calc(0.5 * var(--flick))) 45%,
+      rgba(0,0,0,0) 78%);
+    filter:blur(1px);
+    animation:flame 0.4s ease-in-out infinite;
+  }
+  /* the flame's gentle wiggle (only the candle moves) */
+  @keyframes flame{
+    0%,100%{ transform:translate(-50%,-50%) scale(1); }
+    22%{ transform:translate(-50.7%,-49.3%) scale(1.05); }
+    48%{ transform:translate(-49.4%,-50.6%) scale(0.96); }
+    73%{ transform:translate(-50.4%,-49.6%) scale(1.03); }
+  }
+  .glow-pool{
+    left:93%; top:66%;
+    width:26%; height:18%;
+    transform:translate(-50%,-50%);
+    mix-blend-mode:soft-light;
+    background:radial-gradient(closest-side,
+      rgba(255,206,110, calc(0.5 * var(--flick))) 0%, rgba(0,0,0,0) 80%);
+    filter:blur(3px);
+  }
+  .glow-window{
+    left:7%; top:21%;
+    width:24%; height:34%;
+    transform:translate(-50%,-50%);
+    mix-blend-mode:screen;
+    background:radial-gradient(closest-side,
+      rgba(243,210,74,0.13) 0%, rgba(0,0,0,0) 72%);
+    filter:blur(3px);
+  }
+
+  .smoke{
+    left:var(--cx); top:40%;
+    width:3%; height:16%;
+    transform:translate(-50%,-100%);
+    mix-blend-mode:screen;
+    background:linear-gradient(to top, rgba(220,210,200,0.16), rgba(220,210,200,0));
+    filter:blur(4px); opacity:0;
+    animation:smoke 7.5s ease-in-out infinite;
+  }
+  @keyframes smoke{
+    0%{ opacity:0; transform:translate(-50%,-100%) translateY(6%) scaleY(0.7); }
+    25%{ opacity:.5; } 70%{ opacity:.15; }
+    100%{ opacity:0; transform:translate(-50%,-100%) translateY(-26%) translateX(8%) scaleY(1.25); }
+  }
+
+  .mote{ position:absolute; width:4px; height:4px; border-radius:50%;
+    background:radial-gradient(closest-side, rgba(255,232,170,.85), rgba(255,232,170,0));
+    mix-blend-mode:screen; opacity:0; }
+  .m1{ left:76%; top:50%; animation:m1 19s linear infinite; }
+  .m2{ left:84%; top:60%; width:3px; height:3px; animation:m2 26s linear infinite 4s; }
+  .m3{ left:68%; top:44%; width:5px; height:5px; animation:m3 23s linear infinite 9s; }
+  @keyframes m1{ 0%{opacity:0;transform:translate(0,0)} 12%{opacity:.8} 88%{opacity:.5} 100%{opacity:0;transform:translate(-26px,-150px)} }
+  @keyframes m2{ 0%{opacity:0;transform:translate(0,0)} 14%{opacity:.6} 86%{opacity:.3} 100%{opacity:0;transform:translate(20px,-120px)} }
+  @keyframes m3{ 0%{opacity:0;transform:translate(0,0)} 10%{opacity:.7} 90%{opacity:.4} 100%{opacity:0;transform:translate(-14px,-180px)} }
+
+  .grain{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.5'/></svg>");
+    background-size:300px 300px; mix-blend-mode:multiply; opacity:.10;
+  }
+
+  /* ════════════════ ACT I & II — THE DOORS ════════════════ */
+  /* Heavy oak doors fill the opening; clipped to the arch by .frame.
+     They sit above the (already-developed) cellar scene and swing away on the vow. */
+  .doors{
+    position:absolute; inset:0; z-index:9;
+    transform-style:preserve-3d;
+  }
+  .doors.gone{ pointer-events:none; }
+
+  .leaf{
+    position:absolute; top:0; bottom:0; width:50.4%;
+    backface-visibility:hidden;
+    background-color:#1b110a;
+    background-image:
+      /* plank seams */
+      repeating-linear-gradient(90deg,
+        rgba(0,0,0,.55) 0 1.5px,
+        rgba(0,0,0,0) 1.5px 2.2px,
+        rgba(120,84,46,.05) 2.2px 9%,
+        rgba(0,0,0,0) 9% 13%),
+      /* soft uneven grain */
+      repeating-linear-gradient(91deg,
+        rgba(255,255,255,.018) 0 2px, rgba(0,0,0,0) 2px 5px),
+      /* body modelling, light catching the meeting edge */
+      linear-gradient(180deg, #34210f 0%, #1d1208 46%, #120b05 100%);
+    box-shadow:
+      inset 0 0 60px rgba(0,0,0,.7),
+      inset 0 0 140px rgba(0,0,0,.55);
+    transition:transform 2.5s cubic-bezier(.45,.02,.16,1), opacity 2.5s ease;
+  }
+  .leaf.l{ left:0;  transform-origin:left center;  border-right:1px solid rgba(0,0,0,.6); }
+  .leaf.r{ right:0; transform-origin:right center; border-left:1px solid rgba(120,84,46,.12); }
+
+  /* iron strap bands with rivets */
+  .strap{
+    position:absolute; left:0; right:0; height:5.5%;
+    background:linear-gradient(180deg, #2a2118 0%, #100b07 55%, #1c150d 100%);
+    box-shadow:inset 0 1px 0 rgba(160,130,90,.18), inset 0 -1px 0 rgba(0,0,0,.6), 0 1px 3px rgba(0,0,0,.5);
+  }
+  .strap.t{ top:16%; } .strap.b{ top:74%; }
+  .strap::before, .strap::after{
+    content:""; position:absolute; top:50%; width:1.6%; aspect-ratio:1; border-radius:50%;
+    transform:translateY(-50%);
+    background:radial-gradient(circle at 38% 32%, #6a5538, #1a120a 70%);
+    box-shadow:0 1px 1px rgba(0,0,0,.6);
+  }
+  .leaf.l .strap::before{ left:8%; } .leaf.l .strap::after{ right:18%; }
+  .leaf.r .strap::before{ left:18%; } .leaf.r .strap::after{ right:8%; }
+
+  /* iron ring handles at the meeting edge */
+  .handle{
+    position:absolute; top:46%; width:9%; aspect-ratio:1; border-radius:50%;
+    border:0.7vmin solid #15100a;
+    background:radial-gradient(circle at 40% 34%, rgba(120,96,58,.35), rgba(0,0,0,0) 60%);
+    box-shadow:0 2px 4px rgba(0,0,0,.6), inset 0 1px 2px rgba(0,0,0,.6);
+  }
+  .leaf.l .handle{ right:7%; } .leaf.r .handle{ left:7%; }
+
+  /* the knock — a heavy, contained inward thud */
+  .doors.knock .leaf.l{ animation:thudL .4s cubic-bezier(.3,.9,.2,1); }
+  .doors.knock .leaf.r{ animation:thudR .4s cubic-bezier(.3,.9,.2,1); }
+  @keyframes thudL{ 0%,100%{ transform:none; } 26%{ transform:translateZ(-22px) translateX(-0.6%) rotateY(1.4deg); } }
+  @keyframes thudR{ 0%,100%{ transform:none; } 26%{ transform:translateZ(-22px) translateX(0.6%) rotateY(-1.4deg); } }
+
+  /* the opening — doors swing back on their outer hinges and fade into the dark */
+  .act-open .leaf.l{ transform:rotateY(-118deg); opacity:0; }
+  .act-open .leaf.r{ transform:rotateY(118deg);  opacity:0; }
+
+  /* prompt that lives on the closed doors */
+  .doorface{
+    position:absolute; inset:0; z-index:11;
+    display:grid; place-items:center; text-align:center;
+    pointer-events:none; padding:0 6%;
+  }
+
+  /* ── the knock invitation: a clear, gently pulsing affordance ── */
+  .knock-invite{
+    position:relative; display:grid; place-items:center;
+    width:30%; aspect-ratio:1;
+    opacity:0; transform:translateY(8px);
+    transition:opacity 1s ease, transform 1s ease;
+  }
+  .show-hint .knock-invite{ opacity:1; transform:none; }
+  /* concentric rings radiate outward like the sound of a rap on the wood */
+  .knock-ring{
+    position:absolute; left:50%; top:38%; width:38%; aspect-ratio:1; border-radius:50%;
+    transform:translate(-50%,-50%); pointer-events:none;
+    border:1.5px solid rgba(176,138,60,.7);
+    box-shadow:0 0 10px rgba(176,138,60,.45), inset 0 0 8px rgba(176,138,60,.25);
+    opacity:0; animation:knockPulse 2.6s cubic-bezier(.2,.55,.3,1) infinite;
+  }
+  .knock-ring.d2{ animation-delay:.85s; }
+  .knock-ring.d3{ animation-delay:1.7s; }
+  @keyframes knockPulse{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.45); }
+    14%{ opacity:.9; }
+    70%{ opacity:0; }
+    100%{ opacity:0; transform:translate(-50%,-50%) scale(2.6); }
+  }
+  .knock-word{
+    position:relative; margin:0; z-index:1;
+    font-family:"Cinzel", Georgia, serif; font-weight:600;
+    font-size:clamp(20px,4.4vmin,40px); letter-spacing:.34em;
+    text-indent:.34em;             /* optically re-centre the tracked text */
+    color:var(--foam);
+    text-shadow:0 0 14px rgba(176,138,60,.7), 0 0 36px rgba(176,138,60,.4), 0 2px 0 rgba(0,0,0,.75);
+    animation:knockWord 2.6s ease-in-out infinite;
+  }
+  @keyframes knockWord{ 0%,100%{ transform:scale(1); text-shadow:0 0 14px rgba(176,138,60,.7),0 0 36px rgba(176,138,60,.4),0 2px 0 rgba(0,0,0,.75);} 50%{ transform:scale(1.04); text-shadow:0 0 20px rgba(176,138,60,.95),0 0 52px rgba(176,138,60,.6),0 2px 0 rgba(0,0,0,.75);} }
+  .knock-sub{
+    position:relative; z-index:1; margin:.7em 0 0;
+    font-family:"Grenze Gotisch","Cinzel",serif; font-weight:500;
+    font-size:clamp(12px,1.9vmin,18px); letter-spacing:.16em;
+    color:rgba(199,168,116,.62); text-shadow:0 1px 2px rgba(0,0,0,.7);
+  }
+  /* the iron ring handles glow softly to read as graspable */
+  .show-hint .handle{ animation:handleGlow 2.6s ease-in-out infinite; }
+  .leaf.r .handle{ animation-delay:.4s; }
+  @keyframes handleGlow{ 0%,100%{ box-shadow:0 2px 4px rgba(0,0,0,.6), inset 0 1px 2px rgba(0,0,0,.6);} 50%{ box-shadow:0 2px 4px rgba(0,0,0,.6), inset 0 1px 2px rgba(0,0,0,.6), 0 0 16px rgba(176,138,60,.5);} }
+
+  /* the vow prompt, revealed after the knock */
+  .vow{
+    position:absolute; inset:0; z-index:12;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(14px,3vh,30px);
+    text-align:center; padding:0 8%;
+    opacity:0; visibility:hidden; transition:opacity 1s ease;
+  }
+  .act-vow .knock-invite, .act-open .knock-invite{ opacity:0; transition:opacity .5s ease; }
+  .act-open .doorface{ display:none; }
+  .act-vow .vow{ opacity:1; visibility:visible; transition:opacity 1.1s ease .55s; }
+  .act-open .vow{ opacity:0; visibility:hidden; transition:opacity .6s ease; }
+
+  .vow-text{
+    margin:0; font-family:"Cinzel", Georgia, serif; font-weight:400;
+    font-size:clamp(15px,2.6vmin,24px); letter-spacing:.06em; line-height:1.5;
+    color:var(--foam); max-width:22ch;
+    text-shadow:0 0 18px rgba(255,210,110,.28), 0 2px 0 rgba(0,0,0,.7);
+  }
+  .voveo{
+    position:relative; pointer-events:auto; cursor:pointer;
+    font-family:"Cinzel", Georgia, serif; font-weight:600;
+    font-size:clamp(17px,2.6vmin,26px); letter-spacing:.32em;
+    color:var(--inkgold); background:rgba(20,13,7,.4);
+    border:1px solid rgba(176,138,60,.5); border-radius:2px;
+    padding:.62em 1.5em .62em 1.7em;
+    text-shadow:0 0 14px rgba(176,138,60,.5);
+    box-shadow:inset 0 0 0 0 rgba(176,138,60,0);
+    transition:box-shadow .25s ease, color .25s ease, border-color .25s ease, transform .12s ease;
+    -webkit-tap-highlight-color:transparent; touch-action:none; user-select:none;
+  }
+  .voveo:hover{ color:var(--foam); border-color:rgba(176,138,60,.8); }
+  .voveo.holding{
+    color:var(--foam);
+    box-shadow:inset 0 0 26px rgba(176,138,60,.45), 0 0 22px rgba(176,138,60,.35);
+    transform:scale(.985);
+  }
+  .vow-sub{
+    margin:0; font-family:"Grenze Gotisch","Cinzel",serif;
+    font-size:clamp(12px,1.8vmin,17px); letter-spacing:.12em;
+    color:rgba(199,168,116,.55); transition:opacity .3s ease;
+  }
+  .voveo.holding ~ .vow-sub{ opacity:0; }
+
+  /* the gold border that traces the arch while the vow is held */
+  .trace{
+    position:absolute; inset:0; z-index:14; overflow:visible; pointer-events:none;
+    opacity:0; transition:opacity .35s ease;
+  }
+  .trace.on{ opacity:1; }
+  .trace path{
+    fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;
+    filter:drop-shadow(0 0 1.4px rgba(176,138,60,.9)) drop-shadow(0 0 3px rgba(255,200,90,.6));
+  }
+
+  /* arrival paper wash (develops the cellar in behind the doors) */
+  .develop{ position:absolute; inset:0; pointer-events:none; background:var(--paper); z-index:6; }
+
+  /* ── crown inscription (carved above the arch) — present throughout ── */
+  .archband{ position:absolute; inset:0; overflow:visible; pointer-events:none; z-index:8;
+    opacity:0; transition:opacity 1.1s ease .5s; }
+  .lit .archband{ opacity:1; }
+  .archband text{
+    font-family:"Cinzel", serif; font-weight:600;
+    fill:var(--inkgold); letter-spacing:.14em; font-size:3.4px;
+    paint-order:stroke; stroke:rgba(0,0,0,.55); stroke-width:.6px;
+  }
+
+  /* ── wordmark: a signature low in the corner ── */
+  .wordmark{
+    position:fixed; left:clamp(16px,3.2vw,42px); bottom:clamp(14px,3vh,34px);
+    z-index:20;
+    font-family:"Grenze Gotisch", "Cinzel", serif; font-weight:600;
+    font-size:clamp(26px,4vw,44px); line-height:.92;
+    color:var(--foam);
+    text-shadow:0 1px 0 rgba(0,0,0,.6), 0 0 18px rgba(0,0,0,.5);
+    user-select:none; transform:rotate(-1.5deg);
+    opacity:0; transition:opacity 1.2s ease .3s; white-space:nowrap;
+  }
+  .lit .wordmark{ opacity:1; }
+  .wordmark .dot{ color:var(--flame); }
+
+  /* ── Latin placements (cellar only) ── */
+  .motto-base{
+    position:fixed; left:50%; bottom:clamp(16px,3.2vh,38px);
+    transform:translateX(-50%); z-index:18; text-align:center;
+    font-family:"Cinzel", serif; color:var(--inkgold);
+    font-size:clamp(11px,1.4vw,16px); letter-spacing:.24em; line-height:1.85;
+    text-shadow:0 1px 0 rgba(0,0,0,.6);
+    opacity:0; transition:opacity 1.1s ease .45s; pointer-events:none; max-width:92vw;
+  }
+  .motto-base .lo{ display:block; font-size:.8em; letter-spacing:.3em; opacity:.78; margin-top:.3em; }
+  .ready .motto-base, .ready .motto-col{ opacity:1; }
+
+  .motto-col{
+    position:fixed; top:50%; transform:translateY(-50%); z-index:18;
+    font-family:"Cinzel", serif; color:var(--inkgold);
+    writing-mode:vertical-rl; text-orientation:upright; letter-spacing:.06em;
+    font-size:clamp(12px,1.5vw,19px); text-shadow:0 1px 0 rgba(0,0,0,.6);
+    opacity:0; transition:opacity 1.1s ease .45s; pointer-events:none; white-space:nowrap;
+  }
+  .motto-col.left{ left:clamp(14px,4vw,4vw); }
+  .motto-col.right{ right:clamp(14px,4vw,4vw); transform:translateY(-50%) rotate(180deg); }
+
+  /* which placement shows, driven by body class */
+  .lat-crown   .motto-base, .lat-crown   .motto-col{ display:none; }
+  .lat-base    .archband,   .lat-base    .motto-col{ display:none; }
+  .lat-columns .archband,   .lat-columns .motto-base{ display:none; }
+  .lat-off     .archband,   .lat-off .motto-base, .lat-off .motto-col{ display:none; }
+
+  /* full-bleed comparison mode (portal off) */
+  .portal-off .frame{ -webkit-clip-path:none; clip-path:none; }
+  .portal-off .archband, .portal-off .bloom, .portal-off .spill, .portal-off .trace{ display:none; }
+  .portal-off .portal{ width:max(100vw,100vh); height:max(100vw,100vh); }
+  .portal-off .art{ width:100%; height:100%; object-fit:cover; top:0; }
+
+  .vh{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+  /* ── shush feedback ── */
+  .shush{
+    position:fixed; left:50%; top:28%;
+    transform:translate(-50%,-50%) scale(.9);
+    font-family:"Grenze Gotisch", "Cinzel", serif; font-size:clamp(32px,5.5vw,64px); font-weight:600;
+    color:var(--foam);
+    text-shadow:0 2px 0 rgba(42,32,23,.55), 0 0 22px rgba(255,210,110,.45);
+    letter-spacing:.02em; opacity:0; pointer-events:none; z-index:30; white-space:nowrap;
+  }
+  .shush.show{ animation:shush 1.15s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes shush{
+    0%{ opacity:0; transform:translate(-50%,-46%) scale(.86); }
+    22%{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+    72%{ opacity:1; }
+    100%{ opacity:0; transform:translate(-50%,-58%) scale(1.02); }
+  }
+
+  /* ── sound: a small drawn candle that invites you to light it ── */
+  .sound{
+    position:fixed; right:clamp(14px,3vw,34px); bottom:clamp(14px,3vh,34px);
+    z-index:25; width:46px; height:46px; display:grid; place-items:center;
+    background:none; border:none; padding:0; cursor:pointer;
+    color:var(--foam); filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+    opacity:0; pointer-events:none; transition:opacity 1s ease .7s, transform .25s ease;
+  }
+  .ready .sound{ opacity:1; pointer-events:auto; }
+  .sound:hover{ transform:translateY(-2px); }
+  .sound svg{ width:30px; height:42px; overflow:visible; }
+  .sound .flame{ opacity:0; transform-origin:center bottom; transition:opacity .4s ease; }
+  .sound.on .flame{ opacity:1; animation:tipFlick 1.4s ease-in-out infinite; }
+  @keyframes tipFlick{ 0%,100%{ transform:scaleY(1) translateY(0);} 50%{ transform:scaleY(1.12) translateY(-1px);} }
+  .sound .wick{ stroke:var(--foam); stroke-width:1.6; }
+  .sound .hint, .repo .hint{
+    position:absolute; right:54px; top:50%; transform:translateY(-50%);
+    font-family:"Grenze Gotisch", serif; font-size:19px; color:var(--foam);
+    white-space:nowrap; opacity:0; transition:opacity .3s ease; pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.7);
+  }
+  .sound:hover .hint{ opacity:.85; }
+
+  /* ── a quiet link to the scriptorium (source repo) ── */
+  .repo{
+    position:fixed; right:clamp(14px,3vw,34px); top:clamp(14px,3vh,28px);
+    z-index:25; width:30px; height:30px; display:grid; place-items:center;
+    color:var(--foam); filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+    opacity:0; pointer-events:none; transition:opacity 1s ease .85s, transform .25s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .ready .repo{ opacity:1; pointer-events:auto; }
+  .repo svg{ width:23px; height:23px; opacity:.6; transition:opacity .25s ease; }
+  .repo:hover{ transform:translateY(-2px); }
+  .repo:hover svg{ opacity:1; }
+  .repo .hint{ right:38px; }
+  .repo:hover .hint{ opacity:.85; }
+
+  @media (prefers-reduced-motion: reduce){
+    .smoke,.mote,.glow,.glow-core{ animation:none !important; }
+    .sound.on .flame{ animation:none; }
+    .leaf{ transition:transform 1s ease, opacity 1s ease; }
+    .knock-hint{ animation:none !important; }
+  }
+
+  /* ── Tweaks panel (vanilla; hidden until the host activates it) ── */
+  #tweaks{
+    position:fixed; top:18px; right:18px; z-index:100; width:248px; display:none;
+    background:rgba(20,14,9,.93); border:1px solid rgba(176,138,60,.32);
+    border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.6);
+    color:#e9dcc2; font-family:"Cinzel", Georgia, serif; padding:12px 14px 14px;
+    backdrop-filter:blur(8px);
+  }
+  #tweaks.open{ display:block; }
+  #tweaks .tk-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; cursor:grab; }
+  #tweaks .tk-title{ font-size:14px; letter-spacing:.12em; color:#d9c79c; }
+  #tweaks .tk-x{ background:none; border:none; color:#b9a880; font-size:18px; cursor:pointer; line-height:1; padding:2px 4px; }
+  #tweaks .tk-sec{ font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:#9c875a; margin:13px 0 6px; }
+  #tweaks .tk-label{ font-size:12px; color:#cdbd95; margin-bottom:5px; font-family:Georgia,serif; }
+  #tweaks .tk-seg{ display:flex; gap:4px; background:rgba(0,0,0,.3); padding:3px; border-radius:8px; }
+  #tweaks .tk-seg button{ flex:1; border:none; background:none; color:#b6a47c; cursor:pointer;
+    font-size:11px; padding:6px 4px; border-radius:6px; font-family:Georgia,serif; letter-spacing:.03em; transition:background .15s, color .15s; }
+  #tweaks .tk-seg button.sel{ background:rgba(176,138,60,.9); color:#1a120a; font-weight:600; }
+  #tweaks .tk-sw{ display:flex; gap:8px; margin-top:2px; }
+  #tweaks .tk-sw button{ width:30px; height:30px; border-radius:50%; border:2px solid rgba(255,255,255,.12); cursor:pointer; padding:0; }
+  #tweaks .tk-sw button.sel{ border-color:#f2e7cc; box-shadow:0 0 0 2px rgba(242,231,204,.3); }
+  #tweaks .tk-note{ font-size:10.5px; line-height:1.4; color:#8d7a52; font-family:Georgia,serif; font-style:italic; margin:6px 0 2px; }
+  #tweaks .tk-label{ display:flex; align-items:baseline; justify-content:space-between; }
+  #tweaks .tk-val{ font-family:Georgia,serif; font-size:11px; color:#9c875a; letter-spacing:.04em; }
+  #tweaks .tk-range{ -webkit-appearance:none; appearance:none; width:100%; height:3px; margin:2px 0 4px;
+    border-radius:3px; background:rgba(176,138,60,.28); cursor:pointer; }
+  #tweaks .tk-range::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:15px; height:15px;
+    border-radius:50%; background:#d9c79c; border:2px solid #1a120a; box-shadow:0 0 6px rgba(176,138,60,.5); cursor:pointer; }
+  #tweaks .tk-range::-moz-range-thumb{ width:15px; height:15px; border-radius:50%; background:#d9c79c;
+    border:2px solid #1a120a; box-shadow:0 0 6px rgba(176,138,60,.5); cursor:pointer; }
+  /* floor-fade gradient editor */
+  #tweaks .tk-grad{ position:relative; width:100%; height:150px; margin:8px 0 0; border-radius:8px;
+    border:1px solid rgba(176,138,60,.3); overflow:hidden; cursor:crosshair; touch-action:none;
+    background-color:#191309;
+    background-image:
+      linear-gradient(45deg, rgba(228,208,168,.26) 25%, transparent 25%, transparent 75%, rgba(228,208,168,.26) 75%),
+      linear-gradient(45deg, rgba(228,208,168,.26) 25%, transparent 25%, transparent 75%, rgba(228,208,168,.26) 75%);
+    background-size:14px 14px; background-position:0 0, 7px 7px;
+  }
+  #tweaks .tk-grad .gfill{ position:absolute; inset:0; pointer-events:none; }
+  #tweaks .tk-grad .gline{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #tweaks .tk-grad .gdot{ position:absolute; width:14px; height:14px; transform:translate(-50%,-50%);
+    border-radius:50%; background:#f2e7cc; border:2px solid #1a120a;
+    box-shadow:0 0 7px rgba(0,0,0,.7), 0 0 4px rgba(176,138,60,.6); cursor:grab; touch-action:none; }
+  #tweaks .tk-grad .gdot:active{ cursor:grabbing; }
+  #tweaks .tk-gradhint{ font-size:10px; color:#8d7a52; font-family:Georgia,serif; font-style:italic; margin-top:5px; text-align:center; }
+</style>
+</head>
+<body class="lat-crown act-closed">
+  <main class="stage" id="stage" aria-label="A pair of heavy oak doors set in a dark stone archway. Knock, take the vow of silence, and they open onto Brother Claudius, a crab in a monk's robe, standing in his candlelit cellar.">
+    <div class="bloom" id="bloom"></div>
+
+    <div class="portal" id="portal">
+      <div class="frame">
+        <div class="scene" id="scene">
+          <img class="art" src="assets/brother.png" alt="A hand-drawn crab wearing a rust-red hooded monk's robe stands in a warm stone abbey cellar, claws clasped in prayer, a candle lit beside him." draggable="false" />
+          <div class="layer glow-window"></div>
+          <div class="layer grade"></div>
+          <div class="layer vignette"></div>
+          <div class="layer spill"></div>
+          <div class="glow-pool"></div>
+          <div class="glow"></div>
+          <div class="glow-core"></div>
+          <div class="smoke"></div>
+          <div class="mote m1"></div>
+          <div class="mote m2"></div>
+          <div class="mote m3"></div>
+          <div class="layer grain"></div>
+          <div class="develop" id="develop"></div>
+        </div>
+
+        <!-- Acts I & II: the closed doors -->
+        <div class="doors" id="doors" role="button" tabindex="0"
+             aria-label="The doors are closed. Knock to be received.">
+          <div class="leaf l">
+            <div class="strap t"></div>
+            <div class="strap b"></div>
+            <div class="handle"></div>
+          </div>
+          <div class="leaf r">
+            <div class="strap t"></div>
+            <div class="strap b"></div>
+            <div class="handle"></div>
+          </div>
+        </div>
+
+        <!-- the closed doors invite a knock -->
+        <div class="doorface" id="doorface">
+          <div class="knock-invite" id="knockInvite">
+            <span class="knock-ring"></span>
+            <span class="knock-ring d2"></span>
+            <span class="knock-ring d3"></span>
+            <p class="knock-word">knock</p>
+            <p class="knock-sub">to be received</p>
+          </div>
+        </div>
+
+        <!-- the vow prompt -->
+        <div class="vow" id="vow" aria-hidden="true">
+          <p class="vow-text">To enter, you must take the vow of silence.</p>
+          <button class="voveo" id="voveo" type="button" aria-label="Press and hold for three seconds to vow">Voveo</button>
+          <p class="vow-sub" id="vowSub">— press &amp; hold —</p>
+        </div>
+      </div>
+
+      <!-- gold border that traces the arch while the vow is held -->
+      <svg class="trace" id="trace" viewBox="0 0 100 130" preserveAspectRatio="none" aria-hidden="true">
+        <path id="traceP" d="M0,50 A50,50 0 0 1 100,50 L100,58 L95,64 L95,116 L100,122 L100,130 L0,130 L0,122 L5,116 L5,64 L0,58 Z"/>
+      </svg>
+
+      <svg class="archband" id="archband" viewBox="0 0 100 130" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <path id="crownArc" d="M -2,50 A 52,52 0 0 1 102,50"/>
+        </defs>
+        <text text-anchor="middle">
+          <textPath id="crownText" href="#crownArc" startOffset="50%"></textPath>
+        </text>
+      </svg>
+    </div>
+
+    <div class="shush" id="shush" aria-hidden="true"><span>shhh…</span></div>
+
+    <div class="wordmark" id="wordmark">brother claudi<span class="dot">·</span>us</div>
+
+    <p class="motto-base" id="mottoBase" aria-hidden="true"></p>
+    <div class="motto-col left"  id="mottoColL" aria-hidden="true"></div>
+    <div class="motto-col right" id="mottoColR" aria-hidden="true"></div>
+
+    <p class="vh">Inscription: “Silentium est aurum, ergo tace et ditesce” — silence is gold, therefore be silent and grow rich.</p>
+
+    <button class="sound" id="sound" type="button" aria-pressed="false" aria-label="Snuff the candle — silence the page">
+      <span class="hint">snuff it</span>
+      <svg viewBox="0 0 30 42" aria-hidden="true">
+        <g class="flame">
+          <path d="M15 2 C 19 8, 19 12, 15 15 C 11 12, 11 8, 15 2 Z" fill="var(--flame)"/>
+          <path d="M15 6 C 17 10, 17 12, 15 14 C 13 12, 13 10, 15 6 Z" fill="#ff7a1a"/>
+        </g>
+        <line class="wick" x1="15" y1="15" x2="15" y2="18"/>
+        <rect x="9" y="18" width="12" height="22" rx="2.5" fill="var(--foam)" stroke="var(--ink)" stroke-width="1.4"/>
+        <ellipse cx="15" cy="18" rx="6" ry="2.2" fill="#fff6e0" stroke="var(--ink)" stroke-width="1.2"/>
+      </svg>
+    </button>
+
+    <a class="repo" id="repo" href="https://github.com/githumps/brother-claudius" target="_blank" rel="noopener noreferrer" aria-label="The scriptorium — view the source on GitHub">
+      <span class="hint">the scriptorium</span>
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+
+    <!-- arch-on-piers clip: round head, slim column shafts, capital + base -->
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <defs>
+        <clipPath id="archclip" clipPathUnits="objectBoundingBox">
+          <path id="archPath" d="M0,0.4 A0.5,0.4 0 0 1 1,0.4 L0.965,0.428 L0.965,0.892 L1,0.938 L1,1 L0,1 L0,0.938 L0.035,0.892 L0.035,0.428 L0,0.4 Z"/>
+        </clipPath>
+      </defs>
+    </svg>
+  </main>
+
+  <div id="tweaks" aria-label="Tweaks">
+    <div class="tk-head" id="tkHead">
+      <span class="tk-title">Tweaks</span>
+      <button class="tk-x" id="tkClose" aria-label="Close">×</button>
+    </div>
+    <div id="tkBody"></div>
+  </div>
+
+<script>
+(() => {
+  (function loadFonts(){
+    const href = 'https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Grenze+Gotisch:wght@500;600;700&display=swap';
+    const add = () => { const l=document.createElement('link'); l.rel='stylesheet'; l.href=href; document.head.appendChild(l); };
+    if (document.readyState === 'complete') add();
+    else window.addEventListener('load', () => setTimeout(add,0), {once:true});
+  })();
+
+  const reduce  = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const root    = document.documentElement;
+  const body    = document.body;
+  const scene   = document.getElementById('scene');
+  const stage   = document.getElementById('stage');
+  const develop = document.getElementById('develop');
+  const shushEl = document.getElementById('shush');
+  const soundBtn= document.getElementById('sound');
+  const doors   = document.getElementById('doors');
+  const vowEl   = document.getElementById('vow');
+  const voveo   = document.getElementById('voveo');
+  const trace   = document.getElementById('trace');
+  const traceP  = document.getElementById('traceP');
+
+  const HOLD_MS = 3000;
+  let phase = 'closed';          // 'closed' | 'vow' | 'open'
+  let arrived = false;
+
+  /* ─────────── tweak state (host rewrites this block on disk) ─────────── */
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "latin": "crown",
+    "lettering": "classical",
+    "inkColor": "#b08a3c",
+    "portal": "arch",
+    "act": "doors",
+    "sideInset": 3,
+    "springHeight": 30,
+    "floorFade": 34,
+    "fadeStops": [
+      { "p": 0,       "a": 1 },
+      { "p": 60.875,  "a": 1 },
+      { "p": 83.2734, "a": 0.3589 },
+      { "p": 100,     "a": 0 }
+    ]
+  }/*EDITMODE-END*/;
+  let T = Object.assign({}, TWEAK_DEFAULTS);
+  // deep-copy the stops so edits never mutate the defaults object
+  T.fadeStops = (T.fadeStops||[]).map(s=>({p:+s.p,a:+s.a}));
+
+  const MOTTO = {
+    classical: { full:"SILENTIVM · EST · AVRVM · ERGO · TACE · ET · DITESCE", a:"SILENTIVM · EST · AVRVM", b:"ERGO · TACE · ET · DITESCE" },
+    modern:    { full:"SILENTIUM · EST · AURUM · ERGO · TACE · ET · DITESCE", a:"SILENTIUM · EST · AURUM", b:"ERGO · TACE · ET · DITESCE" }
+  };
+
+  function applyTweaks(){
+    const m = MOTTO[T.lettering] || MOTTO.classical;
+    // keep act + ready/lit classes; only rewrite the tweakable ones
+    body.classList.remove('lat-crown','lat-base','lat-columns','lat-off','portal-off');
+    body.classList.add('lat-' + (T.latin || 'crown'));
+    if (T.portal === 'full') body.classList.add('portal-off');
+    root.style.setProperty('--inkgold', T.inkColor || '#b08a3c');
+    document.getElementById('crownText').textContent = m.full;
+    document.getElementById('mottoBase').innerHTML = m.a + '<span class="lo">' + m.b + '</span>';
+    document.getElementById('mottoColL').textContent = m.a.replace(/ · /g,'  ');
+    document.getElementById('mottoColR').textContent = m.b.replace(/ · /g,'  ');
+  }
+
+  /* ─────────── parametric doorway shape ───────────
+     One arch, generated from two numbers so the sliders can reshape it live:
+       sy = where the round top springs / the shoulders sit (springHeight%)
+       pi = how far the side walls cut inward (sideInset%)
+     The cut-in now happens AT the spring line, so there's no low "shoulder"
+     notch — the sides run straight down to a slim base, closer to the drawing. */
+  const archPath = document.getElementById('archPath');
+  const traceP2  = document.getElementById('traceP');
+  const crownArc = document.getElementById('crownArc');
+  let LEN = 360;
+
+  function buildArch(){
+    const sy  = Math.max(0.28, Math.min(0.52, (T.springHeight ?? 40) / 100));
+    const pi  = Math.max(0,    Math.min(0.12, (T.sideInset    ?? 3)  / 100));
+    const cap = 0.026;                 // capital step just under the spring
+    const by  = 0.9;                   // base flare begins
+    const bh  = pi > 0.001 ? 0.046 : 0;// only flare a base when there are piers
+    const n = (v) => +v.toFixed(4);
+
+    // clip path (objectBoundingBox 0..1)
+    const d =
+      `M0,${n(sy)} A0.5,${n(sy)} 0 0 1 1,${n(sy)}`
+      + ` L1,${n(sy)}`                 // outer edge at the spring (capital top)
+      + ` L${n(1-pi)},${n(sy+cap)}`    // capital steps in
+      + ` L${n(1-pi)},${n(by)}`        // right wall down
+      + ` L1,${n(by+bh)}`              // base flares out
+      + ` L1,1 L0,1`                   // across the floor
+      + ` L0,${n(by+bh)}`              // up the left base
+      + ` L${n(pi)},${n(by)}`          // base flares in
+      + ` L${n(pi)},${n(sy+cap)}`      // left wall up
+      + ` L0,${n(sy)} Z`;              // capital steps out
+    archPath.setAttribute('d', d);
+
+    // trace outline for the vow (viewBox 0 0 100 130) — same shape, scaled
+    const X = (v)=>n(v*100), Y=(v)=>n(v*130);
+    const td =
+      `M0,${Y(sy)} A50,${Y(sy)} 0 0 1 100,${Y(sy)}`
+      + ` L100,${Y(sy)} L${X(1-pi)},${Y(sy+cap)} L${X(1-pi)},${Y(by)} L100,${Y(by+bh)}`
+      + ` L100,130 L0,130`
+      + ` L0,${Y(by+bh)} L${X(pi)},${Y(by)} L${X(pi)},${Y(sy+cap)} L0,${Y(sy)} Z`;
+    traceP2.setAttribute('d', td);
+
+    // crown text arc rides just outside the arch head
+    crownArc.setAttribute('d', `M -2,${Y(sy)} A 52,${n(Y(sy)+2)} 0 0 1 102,${Y(sy)}`);
+
+    // refresh the dash length used by the vow trace (unless mid-hold)
+    try {
+      LEN = traceP2.getTotalLength();
+      if (!holding){ traceP2.style.strokeDasharray = LEN; traceP2.style.strokeDashoffset = LEN; }
+    } catch(_){}
+  }
+
+  function applyShape(){
+    root.style.setProperty('--spillH', (T.floorFade ?? 26) + '%');
+    if (spillEl) spillEl.style.background = gradientCSS(T.floorFade ?? 26);
+    buildArch();
+  }
+
+  /* compose the threshold-spill gradient from the editable stops.
+     stops: {p:0..100 (0 = floor), a:0..1 alpha}. span = how tall the fade is (%). */
+  const spillEl = document.querySelector('.spill');
+  function gradientCSS(span){
+    const s = (T.fadeStops||[]).slice().sort((x,y)=>x.p-y.p);
+    if (!s.length) return `linear-gradient(to top, var(--bg) 0%, rgba(10,7,5,0) ${span}%)`;
+    const parts = s.map(o => `rgba(10,7,5,${(+o.a).toFixed(3)}) ${(o.p/100*span).toFixed(2)}%`);
+    if (s[s.length-1].p < 99.5) parts.push(`rgba(10,7,5,0) ${(+span).toFixed(2)}%`);
+    return `linear-gradient(to top, ${parts.join(', ')})`;
+  }
+
+  /* ─────────── candle: the only thing that moves ─────────── */
+  let flGreet = 0;
+  function flicker(now){
+    const t = now/1000;
+    const slow = Math.sin(t*1.3)*0.06 + Math.sin(t*0.7+1)*0.05;
+    const fast = (Math.sin(t*17) + Math.sin(t*29+2))*0.035;
+    const spit = Math.random() < 0.02 ? -0.16 : 0;
+    let v = 0.74 + slow + fast + spit + flGreet;
+    flGreet *= 0.965;
+    root.style.setProperty('--flick', Math.max(0.42, Math.min(1, v)).toFixed(3));
+  }
+  function loop(now){ if (!reduce) flicker(now); requestAnimationFrame(loop); }
+
+  /* ─────────── arrival: the cellar quietly develops in behind the doors ─────────── */
+  function developIn(){
+    const dur = reduce ? 500 : 1400;
+    const t0 = performance.now();
+    (function step(now){
+      const p = Math.min((now - t0)/dur, 1);
+      develop.style.opacity = String(1 - p);
+      if (!reduce) scene.style.filter = `blur(${((1-p)*6).toFixed(2)}px)`;
+      if (p < 1) requestAnimationFrame(step);
+      else finishArrival();
+    })(performance.now());
+  }
+  function finishArrival(){
+    if (arrived) return; arrived = true;
+    scene.style.filter = '';
+    const d = document.getElementById('develop'); if (d) d.remove();
+    body.classList.add('lit');           // the wordmark signs in
+    // as soon as the scene settles, invite the knock
+    if (phase === 'closed'){
+      setTimeout(() => { if (phase === 'closed') body.classList.add('show-hint'); }, 650);
+    }
+  }
+
+  /* ====================== SOUND (self-contained, Web Audio) ====================== */
+  let ac=null, noiseBuf=null, ambOn=false;
+  function ctx(){
+    if (!ac){
+      ac = new (window.AudioContext||window.webkitAudioContext)();
+      const len = ac.sampleRate*2;
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+
+  /* one heavy wooden rap: a low filtered body + a short knuckle transient */
+  function rap(c, t, gain){
+    // body — pitch dropping thump through a low-pass (the door's mass)
+    const o = c.createOscillator(); o.type='triangle';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(46, t+0.16);
+    const lp = c.createBiquadFilter(); lp.type='lowpass';
+    lp.frequency.setValueAtTime(520, t); lp.frequency.exponentialRampToValueAtTime(180, t+0.2); lp.Q.value=6;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0008, t+0.5);
+    o.connect(lp); lp.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t+0.55);
+    // knuckle — a brief muffled noise burst
+    const n = c.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    const nlp = c.createBiquadFilter(); nlp.type='lowpass'; nlp.frequency.value=380;
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(gain*0.5, t);
+    ng.gain.exponentialRampToValueAtTime(0.0006, t+0.09);
+    n.connect(nlp); nlp.connect(ng); ng.connect(c.destination);
+    n.start(t); n.stop(t+0.12);
+  }
+  function boomKnock(){
+    const c = ctx(), t = c.currentTime;
+    rap(c, t,        0.7);
+    rap(c, t+0.26,   0.62);   // knock-knock
+  }
+
+  /* a low gold drone that rises as the vow is held */
+  let droneOsc=null, droneGain=null, droneLp=null;
+  function startDrone(){
+    const c = ctx(), t = c.currentTime;
+    droneOsc = c.createOscillator(); droneOsc.type='sine'; droneOsc.frequency.setValueAtTime(98, t);
+    droneLp = c.createBiquadFilter(); droneLp.type='lowpass'; droneLp.frequency.value=900;
+    droneGain = c.createGain(); droneGain.gain.setValueAtTime(0.0001, t);
+    droneGain.gain.linearRampToValueAtTime(0.02, t+0.25);
+    droneOsc.connect(droneLp); droneLp.connect(droneGain); droneGain.connect(c.destination);
+    droneOsc.start(t);
+  }
+  function setDroneProgress(p){
+    if (!droneOsc || !ac) return;
+    const t = ac.currentTime;
+    droneOsc.frequency.setTargetAtTime(98 + p*86, t, 0.08);
+    droneGain.gain.setTargetAtTime(0.02 + p*0.05, t, 0.08);
+  }
+  function stopDrone(release){
+    if (!droneOsc || !ac) return;
+    const t = ac.currentTime, o=droneOsc, g=droneGain;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setTargetAtTime(0.0001, t, release ? 0.18 : 0.05);
+    o.stop(t + (release ? 0.6 : 0.2));
+    droneOsc=null; droneGain=null; droneLp=null;
+  }
+  /* a soft two-note resolve when the vow completes */
+  function resolveChime(){
+    const c = ctx(), t = c.currentTime;
+    [[294, t],[392, t+0.16]].forEach(([f, tt]) => {
+      const o=c.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=c.createGain(); g.gain.setValueAtTime(0.0001, tt);
+      g.gain.exponentialRampToValueAtTime(0.06, tt+0.04);
+      g.gain.exponentialRampToValueAtTime(0.0006, tt+1.1);
+      o.connect(g); g.connect(c.destination); o.start(tt); o.stop(tt+1.2);
+    });
+  }
+
+  let lastShush = 0;
+  function shush(){
+    const now = performance.now();
+    if (now - lastShush < 1100) return;
+    lastShush = now;
+    shushEl.classList.remove('show'); void shushEl.offsetWidth; shushEl.classList.add('show');
+    if (!ambOn) return;
+    const c = ctx(), t = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=4600; bp.Q.value=0.8;
+    const hp = c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1800;
+    const g  = c.createGain(); g.gain.value=0;
+    src.connect(bp); bp.connect(hp); hp.connect(g); g.connect(c.destination);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(0.05, t+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0015, t+0.62);
+    bp.frequency.setValueAtTime(5200,t);
+    bp.frequency.exponentialRampToValueAtTime(3200, t+0.6);
+    src.start(t); src.stop(t+0.7);
+  }
+
+  function enableAmbient(on){
+    ambOn = on;
+    soundBtn.classList.toggle('on', ambOn);
+    soundBtn.setAttribute('aria-pressed', String(ambOn));
+    soundBtn.setAttribute('aria-label', ambOn ? 'Snuff the candle — silence the page' : 'Light the candle — allow sound');
+    soundBtn.querySelector('.hint').textContent = ambOn ? 'snuff it' : 'light the candle';
+  }
+  soundBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    enableAmbient(!ambOn);
+    if (ambOn){ ctx(); flGreet = 0.2; }
+  });
+
+  /* ====================== ACT I → II: KNOCK ====================== */
+  function knock(){
+    if (phase !== 'closed') return;
+    doors.classList.remove('knock'); void doors.offsetWidth; doors.classList.add('knock');
+    body.classList.remove('show-hint');
+    boomKnock();
+    phase = 'vow';
+    // let the boom land, then swap the inscription for the vow
+    setTimeout(() => {
+      body.classList.remove('act-closed');
+      body.classList.add('act-vow');
+      vowEl.setAttribute('aria-hidden','false');
+      doors.setAttribute('aria-label','The doors are closed. Take the vow to be admitted.');
+    }, 650);
+  }
+  doors.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('#voveo')) return;
+    if (phase === 'closed'){ e.preventDefault(); ctx(); knock(); }
+  });
+  doors.addEventListener('keydown', (e) => {
+    if (phase === 'closed' && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); ctx(); knock(); }
+  });
+
+  /* ====================== ACT II: THE VOW (press & hold) ====================== */
+  /* trace length (LEN) + dash are now managed by buildArch() so the outline
+     always matches the current doorway shape. */
+
+  let holding=false, holdStart=0, holdRAF=0, vowDone=false;
+
+  function startHold(){
+    if (phase !== 'vow' || vowDone || holding) return;
+    holding = true; holdStart = performance.now();
+    ctx();
+    voveo.classList.add('holding');
+    trace.classList.add('on');
+    traceP.style.transition = 'none';
+    startDrone();
+    holdRAF = requestAnimationFrame(holdStep);
+  }
+  function holdStep(now){
+    if (!holding) return;
+    const p = Math.min((now - holdStart)/HOLD_MS, 1);
+    traceP.style.strokeDashoffset = (LEN * (1 - p)).toFixed(1);
+    setDroneProgress(p);
+    if (p >= 1){ completeVow(); return; }
+    holdRAF = requestAnimationFrame(holdStep);
+  }
+  function cancelHold(){
+    if (!holding || vowDone) return;
+    holding = false; cancelAnimationFrame(holdRAF);
+    voveo.classList.remove('holding');
+    stopDrone(false);
+    // the glow dissipates — the border retreats
+    traceP.style.transition = 'stroke-dashoffset .6s ease';
+    traceP.style.strokeDashoffset = LEN;
+    setTimeout(() => { if (!holding && !vowDone) trace.classList.remove('on'); }, 600);
+  }
+  function completeVow(){
+    vowDone = true; holding = false;
+    voveo.classList.remove('holding');
+    traceP.style.strokeDashoffset = 0;
+    stopDrone(true);
+    resolveChime();
+    openDoors();
+  }
+
+  // pointer (mouse / touch / pen)
+  voveo.addEventListener('pointerdown', (e) => { e.preventDefault(); voveo.setPointerCapture?.(e.pointerId); startHold(); });
+  voveo.addEventListener('pointerup',   cancelHold);
+  voveo.addEventListener('pointercancel', cancelHold);
+  voveo.addEventListener('pointerleave', cancelHold);
+  // keyboard: hold Space / Enter
+  voveo.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); startHold(); } });
+  voveo.addEventListener('keyup',   (e) => { if (e.key === ' ' || e.key === 'Enter'){ cancelHold(); } });
+  window.addEventListener('blur', cancelHold);
+
+  /* ====================== ACT III: THE OPENING ====================== */
+  function openDoors(){
+    phase = 'open';
+    trace.classList.remove('on');
+    body.classList.remove('act-vow'); body.classList.add('act-open');
+    vowEl.setAttribute('aria-hidden','true');
+    doors.setAttribute('aria-hidden','true');
+    const wait = reduce ? 600 : 2500;
+    setTimeout(() => {
+      doors.classList.add('gone');
+      body.classList.add('ready');           // chrome + cellar motto sign in
+      enableAmbient(true);                   // the room is lit — sound comes alive
+      flGreet = 0.3;                         // one warm flare of welcome
+      stage.setAttribute('aria-label','Through a stone archway: Brother Claudius, a crab in a monk\'s robe, stands in his candlelit cellar with his claws clasped, and gives a silent nod of welcome.');
+    }, wait);
+  }
+
+  /* once inside, the page shushes you on any click */
+  stage.addEventListener('pointerdown', (e) => {
+    if (phase !== 'open') return;
+    if (e.target.closest('#sound, #tweaks, #repo')) return;
+    shush();
+  });
+
+  /* ====================== ACT JUMP (for review) ====================== */
+  function gotoDoors(){
+    // close everything back up — a clean re-take of the ritual
+    phase = 'closed'; vowDone = false; holding = false;
+    cancelAnimationFrame(holdRAF); stopDrone(false);
+    body.classList.remove('act-vow','act-open','ready'); body.classList.add('act-closed');
+    doors.classList.remove('gone','knock');
+    vowEl.setAttribute('aria-hidden','true');
+    doors.removeAttribute('aria-hidden');
+    trace.classList.remove('on'); traceP.style.transition='none'; traceP.style.strokeDashoffset = LEN;
+    enableAmbient(false);
+    if (arrived) setTimeout(() => { if (phase==='closed') body.classList.add('show-hint'); }, 800);
+  }
+  function gotoCellar(){
+    phase = 'open'; vowDone = true; holding = false;
+    cancelAnimationFrame(holdRAF); stopDrone(false);
+    body.classList.remove('act-vow','act-closed','show-hint'); body.classList.add('act-open','ready');
+    doors.classList.add('gone'); doors.setAttribute('aria-hidden','true');
+    vowEl.setAttribute('aria-hidden','true');
+    trace.classList.remove('on');
+    enableAmbient(true); flGreet = 0.25;
+  }
+  function applyAct(){ (T.act === 'cellar') ? gotoCellar() : gotoDoors(); }
+
+  /* ====================== TWEAKS (vanilla host protocol) ====================== */
+  const panel = document.getElementById('tweaks');
+  const tkBody= document.getElementById('tkBody');
+
+  function setTweak(key, val){
+    T[key] = val;
+    applyTweaks();
+    applyShape();
+    if (key === 'act') applyAct();
+    buildPanel();
+    window.parent.postMessage({ type:'__edit_mode_set_keys', edits:{ [key]: val } }, '*');
+  }
+  // commit a value to the host WITHOUT rebuilding the panel (keeps live editors alive)
+  function commit(key){
+    window.parent.postMessage({ type:'__edit_mode_set_keys', edits:{ [key]: T[key] } }, '*');
+  }
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const SVGNS = 'http://www.w3.org/2000/svg';
+
+  /* a small 2-D gradient editor for the floor fade.
+     vertical = position (bottom of pad = floor, top = top of fade);
+     horizontal = opacity (left = clear, right = solid).
+     drag points · click empty to add · double-click a point to remove. */
+  function gradientEditor(key){
+    const wrap = document.createElement('div');
+    const pad = document.createElement('div'); pad.className='tk-grad';
+    const fill = document.createElement('div'); fill.className='gfill'; pad.appendChild(fill);
+    const svg = document.createElementNS(SVGNS,'svg'); svg.setAttribute('class','gline');
+    svg.setAttribute('preserveAspectRatio','none');
+    const poly = document.createElementNS(SVGNS,'polyline');
+    poly.setAttribute('fill','none'); poly.setAttribute('stroke','rgba(242,231,204,.5)'); poly.setAttribute('stroke-width','1.4');
+    svg.appendChild(poly); pad.appendChild(svg);
+    wrap.appendChild(pad);
+    const hint = document.createElement('div'); hint.className='tk-gradhint';
+    hint.textContent='drag points · click to add · dbl-click to remove';
+    wrap.appendChild(hint);
+
+    const dotFor = new Map();   // stopObj -> dotEl
+    const W = ()=> pad.clientWidth || 220;
+    const H = ()=> pad.clientHeight || 150;
+
+    function place(dot, s){ dot.style.left=(s.a*W())+'px'; dot.style.top=((1-s.p/100)*H())+'px'; }
+    function refreshVisual(){
+      fill.style.background = gradientCSS(100);          // pad always shows the full curve
+      applyShape();                                      // and the real scene updates live
+      const w=W(), h=H(); svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+      const sorted=(T[key]||[]).slice().sort((a,b)=>a.p-b.p);
+      poly.setAttribute('points', sorted.map(s=>`${(s.a*w).toFixed(1)},${((1-s.p/100)*h).toFixed(1)}`).join(' '));
+      dotFor.forEach((dot,s)=>place(dot,s));
+    }
+    function makeDot(s){
+      const dot=document.createElement('div'); dot.className='gdot';
+      dotFor.set(s,dot); pad.appendChild(dot); place(dot,s);
+      dot.addEventListener('pointerdown',(e)=>{
+        e.preventDefault(); e.stopPropagation(); dot.setPointerCapture(e.pointerId);
+        const r=pad.getBoundingClientRect();
+        const move=(ev)=>{ s.a=clamp((ev.clientX-r.left)/r.width,0,1); s.p=clamp((1-(ev.clientY-r.top)/r.height)*100,0,100); refreshVisual(); };
+        const up=()=>{ dot.removeEventListener('pointermove',move); dot.removeEventListener('pointerup',up); commit(key); };
+        dot.addEventListener('pointermove',move); dot.addEventListener('pointerup',up);
+      });
+      dot.addEventListener('dblclick',(e)=>{
+        e.preventDefault(); e.stopPropagation();
+        if ((T[key]||[]).length<=2) return;            // keep at least two anchors
+        T[key]=T[key].filter(x=>x!==s); dot.remove(); dotFor.delete(s);
+        refreshVisual(); commit(key);
+      });
+      return dot;
+    }
+    function rebuildDots(){ dotFor.forEach(d=>d.remove()); dotFor.clear(); (T[key]||[]).forEach(makeDot); }
+
+    pad.addEventListener('pointerdown',(e)=>{
+      if ((T[key]||[]).length>=6) return;
+      const r=pad.getBoundingClientRect();
+      const s={ a:clamp((e.clientX-r.left)/r.width,0,1), p:clamp((1-(e.clientY-r.top)/r.height)*100,0,100) };
+      T[key]=(T[key]||[]).concat(s);
+      const dot=makeDot(s); refreshVisual();
+      dot.setPointerCapture(e.pointerId);
+      const move=(ev)=>{ s.a=clamp((ev.clientX-r.left)/r.width,0,1); s.p=clamp((1-(ev.clientY-r.top)/r.height)*100,0,100); refreshVisual(); };
+      const up=()=>{ dot.removeEventListener('pointermove',move); dot.removeEventListener('pointerup',up); commit(key); };
+      dot.addEventListener('pointermove',move); dot.addEventListener('pointerup',up);
+    });
+
+    requestAnimationFrame(()=>{ rebuildDots(); refreshVisual(); });
+    return wrap;
+  }
+  function seg(label, key, opts){
+    const wrap=document.createElement('div');
+    const lab=document.createElement('div'); lab.className='tk-label'; lab.textContent=label; wrap.appendChild(lab);
+    const s=document.createElement('div'); s.className='tk-seg';
+    opts.forEach(([val,txt])=>{ const b=document.createElement('button'); b.textContent=txt;
+      if(T[key]===val) b.classList.add('sel'); b.onclick=()=>setTweak(key,val); s.appendChild(b); });
+    wrap.appendChild(s); return wrap;
+  }
+  /* slider: live-updates the shape on input (cheap, no rebuild) and commits on release */
+  function slider(label, key, min, max, step, fmt){
+    const wrap=document.createElement('div');
+    const lab=document.createElement('div'); lab.className='tk-label';
+    const name=document.createElement('span'); name.textContent=label;
+    const val=document.createElement('span'); val.className='tk-val'; val.textContent=(fmt?fmt(T[key]):T[key]);
+    lab.appendChild(name); lab.appendChild(val);
+    const i=document.createElement('input'); i.type='range'; i.className='tk-range';
+    i.min=min; i.max=max; i.step=step; i.value=T[key];
+    i.addEventListener('input', ()=>{ T[key]=parseFloat(i.value); val.textContent=(fmt?fmt(T[key]):T[key]); applyShape(); });
+    i.addEventListener('change', ()=>{ setTweak(key, parseFloat(i.value)); });
+    wrap.appendChild(lab); wrap.appendChild(i); return wrap;
+  }
+  function sec(txt){ const d=document.createElement('div'); d.className='tk-sec'; d.textContent=txt; return d; }
+  function note(txt){ const d=document.createElement('div'); d.className='tk-note'; d.textContent=txt; return d; }
+  const pct = (v)=> v + '%';
+  function buildPanel(){
+    tkBody.innerHTML='';
+    tkBody.appendChild(sec('Preview'));
+    tkBody.appendChild(seg('Act','act',[['doors','Doors'],['cellar','Cellar']]));
+    tkBody.appendChild(note('Switch to Cellar to shape the open doorway.'));
+
+    tkBody.appendChild(sec('Doorway shape'));
+    tkBody.appendChild(slider('Spring height','springHeight',28,52,1,pct));
+    tkBody.appendChild(slider('Side cut-in','sideInset',0,12,0.5,pct));
+  }
+  window.addEventListener('message', (e) => {
+    const t = e?.data?.type;
+    if (t === '__activate_edit_mode'){ buildPanel(); panel.classList.add('open'); }
+    else if (t === '__deactivate_edit_mode'){ panel.classList.remove('open'); }
+  });
+  window.parent.postMessage({ type:'__edit_mode_available' }, '*');
+  document.getElementById('tkClose').onclick = () => {
+    panel.classList.remove('open');
+    window.parent.postMessage({ type:'__edit_mode_dismissed' }, '*');
+  };
+  (function(){
+    const head=document.getElementById('tkHead'); let sx,sy,ox,oy,drag=false;
+    head.addEventListener('pointerdown',(e)=>{ if(e.target.id==='tkClose')return; drag=true; sx=e.clientX; sy=e.clientY;
+      const r=panel.getBoundingClientRect(); ox=r.left; oy=r.top; panel.style.right='auto'; panel.style.left=ox+'px'; panel.style.top=oy+'px'; head.setPointerCapture(e.pointerId); });
+    head.addEventListener('pointermove',(e)=>{ if(!drag)return; panel.style.left=(ox+e.clientX-sx)+'px'; panel.style.top=(oy+e.clientY-sy)+'px'; });
+    head.addEventListener('pointerup',()=>{ drag=false; });
+  })();
+
+  /* ─────────── go ─────────── */
+  applyTweaks();
+  applyShape();
+  if (T.act === 'cellar') applyAct();
+  requestAnimationFrame(loop);
+  const art = document.querySelector('.art');
+  if (art.complete) developIn();
+  else { art.addEventListener('load', developIn); art.addEventListener('error', developIn); }
+  setTimeout(() => { if (!arrived) finishArrival(); }, 2600);  // insurance vs throttled rAF
+})();
+</script>
+
+<template id="__bundler_thumbnail">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <rect width="100" height="100" fill="#0a0705"/>
+    <path d="M32 80 L32 46 A18 18 0 0 1 68 46 L68 80 Z" fill="#2a1d12"/>
+    <circle cx="50" cy="52" r="13" fill="#b54420"/>
+    <circle cx="46" cy="49" r="2" fill="#fff"/><circle cx="54" cy="49" r="2" fill="#fff"/>
+  </svg>
+</template>
+</body>
+</html>
