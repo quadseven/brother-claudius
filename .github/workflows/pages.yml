@@ -13,6 +13,13 @@ permissions:
   pages: write
   id-token: write
 
+# Serialize Pages deploys: only one in-flight publish at a time, and let an
+# in-progress deploy finish rather than be cancelled mid-upload — so a slower
+# older run can't clobber a newer site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   deploy:
     uses: githumps/infra-public/.github/workflows/deploy.pages.yml@cd83e5727c0a7b904f780960664a51b3a3a0c685
