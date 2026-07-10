@@ -47,12 +47,16 @@ if command -v jq >/dev/null 2>&1; then
 else
   # Fallback (no jq): emit the same envelope by hand so re-injection still works on
   # jq-less systems. Current Claude Code parses this JSON envelope; raw stdout on exit 0
-  # is not a guaranteed injection path. Escape for a JSON string in order — backslash,
-  # then double quote, then newline. The VOW is ASCII punctuation + literal UTF-8, both
-  # valid inside a JSON string, so no further escaping is required.
+  # is not a guaranteed injection path. Escape for a JSON string — backslash FIRST, then
+  # the double quote and every control char a heredoc can carry (newline, and CR/tab/BS/FF
+  # in case the script is checked out CRLF, e.g. Windows Git Bash). Matches jq's output.
   esc=${VOW//\\/\\\\}
   esc=${esc//\"/\\\"}
   esc=${esc//$'\n'/\\n}
+  esc=${esc//$'\r'/\\r}
+  esc=${esc//$'\t'/\\t}
+  esc=${esc//$'\b'/\\b}
+  esc=${esc//$'\f'/\\f}
   printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s"}}\n' "$esc"
 fi
 exit 0
