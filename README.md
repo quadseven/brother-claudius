@@ -1,4 +1,4 @@
-![Brother Claudius — a crab in a Trappist monk's robe, claws clasped in his candlelit cloister. He has taken the vow of silence.](brother.png)
+![Brother Claudius — a crab in a Trappist monk's robe, claws clasped in his candlelit cloister. He has taken the vow of silence.](assets/brother.png)
 
 <!--
 
