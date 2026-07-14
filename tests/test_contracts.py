@@ -104,6 +104,11 @@ class SilenceHookContract(unittest.TestCase):
                 result = run_hook(SILENCE_HOOK, payload)
                 self.assertEqual(json.loads(result.stdout)["decision"], "block")
 
+    def test_malformed_json_blocks_stop_with_jq_available(self) -> None:
+        """Block malformed input on the default jq-preferring path."""
+        result = run_hook(SILENCE_HOOK, '{"last_assistant_message":""')
+        self.assertEqual(json.loads(result.stdout)["decision"], "block")
+
     def test_jq_less_fallback_is_fail_closed(self) -> None:
         """Block non-empty messages when Python is the JSON parser."""
         result = run_hook(
