@@ -3,7 +3,7 @@
 # Tool calls remain unaffected; the model must simply stop after its last tool.
 set -euo pipefail
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(</dev/stdin)"
 IS_EMPTY="no"
 
 if command -v jq >/dev/null 2>&1; then
@@ -13,10 +13,26 @@ if command -v jq >/dev/null 2>&1; then
         2>/dev/null \
       || printf 'no'
   )"
-elif printf '%s' "$INPUT" | grep -Eq '"last_assistant_message"[[:space:]]*:[[:space:]]*(""|null)'; then
-  if ! printf '%s' "$INPUT" | grep -Eq '"last_assistant_message"[[:space:]]*:[[:space:]]*null'; then
-    IS_EMPTY="yes"
-  fi
+elif command -v python3 >/dev/null 2>&1; then
+  IS_EMPTY="$(
+    printf '%s' "$INPUT" | python3 -c '
+import json
+import sys
+
+try:
+    payload = json.load(sys.stdin)
+except (json.JSONDecodeError, UnicodeDecodeError):
+    print("no")
+else:
+    print(
+        "yes"
+        if isinstance(payload, dict)
+        and "last_assistant_message" in payload
+        and payload["last_assistant_message"] == ""
+        else "no"
+    )
+' 2>/dev/null || printf 'no'
+  )"
 fi
 
 if [ "$IS_EMPTY" = "yes" ]; then
