@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,7 @@ def run_hook(
     payload: dict[str, object] | str,
     *,
     without_jq: bool = False,
+    with_jq: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Run a hook with structured or deliberately malformed raw input."""
     env = os.environ.copy()
@@ -39,10 +41,18 @@ def run_hook(
             env=env,
         )
 
-    if not without_jq:
+    if without_jq and with_jq:
+        raise ValueError("without_jq and with_jq are mutually exclusive")
+    if not without_jq and not with_jq:
         return invoke()
     with tempfile.TemporaryDirectory() as path_dir:
-        Path(path_dir, "python3").symlink_to(sys.executable)
+        if without_jq:
+            Path(path_dir, "python3").symlink_to(sys.executable)
+        else:
+            jq_path = shutil.which("jq")
+            if jq_path is None:
+                raise unittest.SkipTest("jq is required for this contract")
+            Path(path_dir, "jq").symlink_to(jq_path)
         env["PATH"] = path_dir
         return invoke()
 
@@ -106,7 +116,11 @@ class SilenceHookContract(unittest.TestCase):
 
     def test_malformed_json_blocks_stop_with_jq_available(self) -> None:
         """Block malformed input on the default jq-preferring path."""
-        result = run_hook(SILENCE_HOOK, '{"last_assistant_message":""')
+        result = run_hook(
+            SILENCE_HOOK,
+            '{"last_assistant_message":""',
+            with_jq=True,
+        )
         self.assertEqual(json.loads(result.stdout)["decision"], "block")
 
     def test_jq_less_fallback_is_fail_closed(self) -> None:
