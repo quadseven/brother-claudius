@@ -1,0 +1,34 @@
+name: Test plugin contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-contracts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Validate plugin contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Validate hook configuration
+        run: python -m json.tool hooks/hooks.json >/dev/null
+      - name: Validate shell syntax
+        run: bash -n hooks/scripts/*.sh
+      - name: Validate landing-page JavaScript syntax
+        run: sed -n '/<script>/,/<\/script>/p' index.html | sed '1d;$d' | node --check -
+      - name: Run regression contracts
+        run: python -m unittest discover -s tests -v
