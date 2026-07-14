@@ -1090,17 +1090,25 @@
   const panel = document.getElementById('tweaks');
   const tkBody= document.getElementById('tkBody');
 
+  // The production page has no cross-origin edit host. Keep the preview
+  // protocol available to a same-origin editor without exposing it to an
+  // arbitrary page that embeds Brother Claudius.
+  const EDIT_MODE_ORIGIN = window.location.origin;
+  function postToEditHost(payload){
+    if (window.parent !== window) window.parent.postMessage(payload, EDIT_MODE_ORIGIN);
+  }
+
   function setTweak(key, val){
     T[key] = val;
     applyTweaks();
     applyShape();
     if (key === 'act') applyAct();
     buildPanel();
-    window.parent.postMessage({ type:'__edit_mode_set_keys', edits:{ [key]: val } }, '*');
+    postToEditHost({ type:'__edit_mode_set_keys', edits:{ [key]: val } });
   }
   // commit a value to the host WITHOUT rebuilding the panel (keeps live editors alive)
   function commit(key){
-    window.parent.postMessage({ type:'__edit_mode_set_keys', edits:{ [key]: T[key] } }, '*');
+    postToEditHost({ type:'__edit_mode_set_keys', edits:{ [key]: T[key] } });
   }
   const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
   const SVGNS = 'http://www.w3.org/2000/svg';
@@ -1206,14 +1214,15 @@
     tkBody.appendChild(slider('Side cut-in','sideInset',0,12,0.5,pct));
   }
   window.addEventListener('message', (e) => {
+    if (e.source !== window.parent || e.origin !== EDIT_MODE_ORIGIN) return;
     const t = e?.data?.type;
     if (t === '__activate_edit_mode'){ buildPanel(); panel.classList.add('open'); }
     else if (t === '__deactivate_edit_mode'){ panel.classList.remove('open'); }
   });
-  window.parent.postMessage({ type:'__edit_mode_available' }, '*');
+  postToEditHost({ type:'__edit_mode_available' });
   document.getElementById('tkClose').onclick = () => {
     panel.classList.remove('open');
-    window.parent.postMessage({ type:'__edit_mode_dismissed' }, '*');
+    postToEditHost({ type:'__edit_mode_dismissed' });
   };
   (function(){
     const head=document.getElementById('tkHead'); let sx,sy,ox,oy,drag=false;

@@ -10,9 +10,7 @@
   /plugin install vow-of-silence
 
   # restart Claude Code (or /clear) once, and the Rule is upon you —
-  # he answers only in gestures, every session, until you say to him, verbatim:
-
-  speak freely
+  # chat remains fully silent until the plugin is disabled.
 
   [nods]
 

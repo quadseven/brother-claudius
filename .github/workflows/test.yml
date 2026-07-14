@@ -1,0 +1,27 @@
+name: Test plugin contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Validate hook configuration
+        run: python -m json.tool hooks/hooks.json >/dev/null
+      - name: Validate shell syntax
+        run: bash -n hooks/scripts/*.sh
+      - name: Validate landing-page JavaScript syntax
+        run: sed -n '/<script>/,/<\/script>/p' index.html | sed '1d;$d' | node --check -
+      - name: Run regression contracts
+        run: python -m unittest discover -s tests -v
