@@ -28,7 +28,9 @@ def run_hook(
     input_text = payload if isinstance(payload, str) else json.dumps(payload)
 
     def invoke() -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        # Executable and hook paths are repository-owned constants; only the
+        # JSON fixture is variable, and it is passed through stdin.
+        return subprocess.run(  # noqa: S603
             ["/bin/bash", str(path)],
             input=input_text,
             text=True,

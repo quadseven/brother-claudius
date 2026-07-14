@@ -8,8 +8,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: plugin-contracts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contracts:
+    name: Validate plugin contracts
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
