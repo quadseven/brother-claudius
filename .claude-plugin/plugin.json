@@ -3,13 +3,13 @@
   "description": "A Trappist vow of silence for Claude Code — Brother Claudius fulfils every request but speaks only through tool calls, diffs, code blocks, and bracketed stage directions like [nods] and [bows]. Never prose.",
   "version": "1.0.0",
   "author": {
-    "name": "githumps",
-    "url": "https://github.com/githumps"
+    "name": "quadseven",
+    "url": "https://github.com/quadseven"
   },
   "homepage": "https://brotherclaudi.us",
   "repository": {
     "type": "git",
-    "url": "https://github.com/githumps/brother-claudius.git"
+    "url": "https://github.com/quadseven/brother-claudius.git"
   },
   "license": "MIT"
 }
