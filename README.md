@@ -6,7 +6,7 @@
 
   # to take the vow yourself — in Claude Code:
 
-  /plugin marketplace add githumps/brother-claudius
+  /plugin marketplace add quadseven/brother-claudius
   /plugin install vow-of-silence
 
   # restart Claude Code (or /clear) once, and the Rule is upon you —
